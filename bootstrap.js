@@ -22,6 +22,63 @@ if (fs.existsSync(zohoFile)) {
     'import "server-only";',
     'import "server-only";\n\nprocess.env.ZOHO_ACCOUNTS_URL ||= "https://accounts.zoho.com";\nprocess.env.ZOHO_API_DOMAIN ||= "https://www.zohoapis.com";',
   );
+
+  source = source.replace(
+`export async function findContactByEmail(email: string): Promise<RawContactRecord | null> {
+  const rows = await coql(
+    \`select \${CONTACT_AUTH_SELECT} from Contacts where Email = '\${coqlString(email)}' limit 2\`,
+  );
+  if (rows.length !== 1) return null;
+  return rows[0] as unknown as RawContactRecord;
+}
+
+export async function getContactDashboardData(contactId: string): Promise<RawContactRecord | null> {
+  const rows = await coql(
+    \`select \${CONTACT_DASHBOARD_SELECT} from Contacts where id = '\${coqlString(contactId)}' limit 1\`,
+  );
+  if (rows.length !== 1) return null;
+  return rows[0] as unknown as RawContactRecord;
+}`,
+`export async function findContactByEmail(email: string): Promise<RawContactRecord | null> {
+  const json = (await zohoFetch(
+    \`/crm/v8/Contacts/search?criteria=\${encodeURIComponent(\`(Email:equals:\${email})\`)}&fields=\${encodeURIComponent(CONTACT_AUTH_SELECT)}\`,
+    { method: "GET" },
+  )) as { data?: RawContactRecord[] };
+  const rows = json.data ?? [];
+  if (rows.length !== 1) return null;
+  return rows[0] ?? null;
+}
+
+export async function getContactDashboardData(contactId: string): Promise<RawContactRecord | null> {
+  const json = (await zohoFetch(
+    \`/crm/v8/Contacts/\${encodeURIComponent(contactId)}?fields=\${encodeURIComponent(CONTACT_DASHBOARD_SELECT)}\`,
+    { method: "GET" },
+  )) as { data?: RawContactRecord[] };
+  return json.data?.[0] ?? null;
+}`,
+  );
+
+  source = source.replace(
+`export async function findCheckinByKey(checkInKey: string): Promise<{ id: string } | null> {
+  const rows = await coql(
+    \`select \${CHECKIN_STATUS_SELECT} from \${MODULE_API_NAME} where \${CHECKIN_FIELDS.checkInKey} = '\${coqlString(
+      checkInKey,
+    )}' limit 1\`,
+  );
+  if (rows.length !== 1) return null;
+  return { id: rows[0]!.id as string };
+}`,
+`export async function findCheckinByKey(checkInKey: string): Promise<{ id: string } | null> {
+  const json = (await zohoFetch(
+    \`/crm/v8/\${MODULE_API_NAME}/search?criteria=\${encodeURIComponent(\`(\${CHECKIN_FIELDS.checkInKey}:equals:\${checkInKey})\`)}&fields=\${encodeURIComponent(CHECKIN_STATUS_SELECT)}\`,
+    { method: "GET" },
+  )) as { data?: Array<{ id?: string }> };
+  const rows = json.data ?? [];
+  if (rows.length !== 1 || !rows[0]?.id) return null;
+  return { id: rows[0].id };
+}`,
+  );
+
   fs.writeFileSync(zohoFile, source);
 }
 
