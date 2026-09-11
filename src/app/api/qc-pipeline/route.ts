@@ -149,10 +149,14 @@ export async function GET() {
     if (createdId) {
       try { await deleteCheckinRecord(createdId); } catch {}
     }
+    const e = error as { message?: string; code?: string; status?: number; details?: unknown };
     return NextResponse.json({
       ok: false,
       stage,
-      error: error instanceof Error ? error.message : "unknown",
+      error: e?.message ?? "unknown",
+      code: e?.code ?? null,
+      status: e?.status ?? null,
+      details: e?.details ?? null,
     }, { status: 500 });
   }
 }
