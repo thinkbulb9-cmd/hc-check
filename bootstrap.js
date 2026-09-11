@@ -58,14 +58,25 @@ export async function getContactDashboardData(contactId: string): Promise<RawCon
     const json = (await zohoFetch(
       \`/crm/v8/\${MODULE_API_NAME}/search?criteria=\${encodeURIComponent(\`(\${CHECKIN_FIELDS.checkInKey}:equals:\${checkInKey})\`)}&fields=\${encodeURIComponent(fields)}\`,
       { method: "GET" },
-    )) as { data?: Array<{ id?: string }> };
+    )) as { data?: Array<{ id?: string; Check_in_Key?: string }> };
     const rows = json.data ?? [];
-    if (rows.length !== 1 || !rows[0]?.id) return null;
-    return { id: rows[0].id };
+    const exact = rows.find((row) => row.id && String(row.Check_in_Key ?? "") === checkInKey);
+    if (exact?.id) return { id: exact.id };
   } catch (error) {
-    if (error instanceof ZohoApiError && error.status === 204) return null;
-    throw error;
+    if (!(error instanceof ZohoApiError && error.status === 204)) throw error;
   }
+
+  // Zoho search indexing can lag just-created records. Fall back to the newest
+  // records from the module and compare the unique key locally.
+  const listFields = \`id,\${CHECKIN_FIELDS.checkInKey}\`;
+  const list = (await zohoFetch(
+    \`/crm/v8/\${MODULE_API_NAME}?fields=\${encodeURIComponent(listFields)}&per_page=200&sort_by=Modified_Time&sort_order=desc\`,
+    { method: "GET" },
+  )) as { data?: Array<{ id?: string; Check_in_Key?: string }> };
+  const exact = (list.data ?? []).find(
+    (row) => row.id && String(row.Check_in_Key ?? "") === checkInKey,
+  );
+  return exact?.id ? { id: exact.id } : null;
 }`,
   );
 
@@ -197,7 +208,7 @@ export async function POST(req: NextRequest) {
 }
 `);
 
-// Remove temporary diagnostics except qc-final while final verification is active.
+// Remove temporary diagnostics except QC endpoints while final verification is active.
 for (const diag of [
   'src/app/api/diag-login-match/route.ts',
   'src/app/api/diag-contact/route.ts',
