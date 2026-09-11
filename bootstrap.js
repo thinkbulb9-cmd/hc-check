@@ -9,14 +9,7 @@ for (let i = 0; ; i++) {
 }
 if (!chunks.length) throw new Error('No HappyCoin bootstrap chunks found');
 const encoded = chunks.join('');
-let data;
-try {
-  data = JSON.parse(zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
-} catch (error) {
-  console.error('HappyCoin bootstrap restore failed:', error && error.message ? error.message : error);
-  console.error(`Chunks read: ${chunks.length}; base64 length: ${encoded.length}`);
-  throw error;
-}
+const data = JSON.parse(zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
 for (const [file, content] of Object.entries(data)) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content);
