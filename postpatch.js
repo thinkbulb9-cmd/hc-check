@@ -20,14 +20,22 @@ source = source.replaceAll(
 
 fs.writeFileSync(zohoFile, source);
 
-// Zoho lookup fields must be submitted as { id: "..." }, not a bare record ID.
 const mappingFile = 'src/lib/field-mapping.ts';
 if (!fs.existsSync(mappingFile)) throw new Error('field-mapping.ts missing after bootstrap');
 let mapping = fs.readFileSync(mappingFile, 'utf8');
+
+// Zoho lookup fields must be submitted as { id: "..." }, not a bare record ID.
 mapping = mapping.replace(
   '[f.contact]: ctx.contactId,',
   '[f.contact]: { id: ctx.contactId },',
 );
+
+// Zoho datetime fields require RFC3339 without milliseconds and with an explicit offset.
+mapping = mapping.replace(
+  '[f.submittedAt]: new Date().toISOString(),',
+  '[f.submittedAt]: new Date().toISOString().replace(/\\.\\d{3}Z$/, "+00:00"),',
+);
+
 fs.writeFileSync(mappingFile, mapping);
 
 console.log('Applied deterministic HappyCoin production postpatch');
