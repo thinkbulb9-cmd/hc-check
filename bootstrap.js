@@ -43,4 +43,5 @@ if (fs.existsSync(verifyRoute)) {
   fs.writeFileSync(verifyRoute, source);
 }
 
+// Redeploy marker: refresh production environment variables.
 console.log(`Restored ${Object.keys(data).length} HappyCoin source files`);
