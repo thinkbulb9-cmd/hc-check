@@ -43,8 +43,4 @@ if (fs.existsSync(verifyRoute)) {
   fs.writeFileSync(verifyRoute, source);
 }
 
-const diagRoute = 'src/app/api/diag-zoho/route.ts';
-fs.mkdirSync(path.dirname(diagRoute), { recursive: true });
-fs.writeFileSync(diagRoute, `import { NextResponse } from "next/server";\n\nexport async function GET() {\n  const accountsUrl = process.env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com";\n  const clientId = process.env.ZOHO_CLIENT_ID;\n  const clientSecret = process.env.ZOHO_CLIENT_SECRET;\n  const refreshToken = process.env.ZOHO_REFRESH_TOKEN;\n  const presence = { clientId: !!clientId, clientSecret: !!clientSecret, refreshToken: !!refreshToken };\n  if (!clientId || !clientSecret || !refreshToken) return NextResponse.json({ ok:false, stage:"env", presence, accountsUrl }, {status:500});\n  try {\n    const body = new URLSearchParams({ grant_type:"refresh_token", client_id:clientId, client_secret:clientSecret, refresh_token:refreshToken });\n    const res = await fetch(accountsUrl + "/oauth/v2/token", { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body, cache:"no-store" });\n    const json:any = await res.json().catch(() => ({}));\n    return NextResponse.json({ ok:res.ok, stage:"token", httpStatus:res.status, zohoError:json.error ?? null, apiDomain:json.api_domain ?? null, hasAccessToken:!!json.access_token, presence, accountsUrl }, {status:res.ok?200:500});\n  } catch (e) {\n    return NextResponse.json({ ok:false, stage:"network", message:e instanceof Error ? e.message : String(e), presence, accountsUrl }, {status:500});\n  }\n}\n`);
-
 console.log(`Restored ${Object.keys(data).length} HappyCoin source files`);
