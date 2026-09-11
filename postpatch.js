@@ -19,4 +19,15 @@ source = source.replaceAll(
 );
 
 fs.writeFileSync(zohoFile, source);
+
+// Zoho lookup fields must be submitted as { id: "..." }, not a bare record ID.
+const mappingFile = 'src/lib/field-mapping.ts';
+if (!fs.existsSync(mappingFile)) throw new Error('field-mapping.ts missing after bootstrap');
+let mapping = fs.readFileSync(mappingFile, 'utf8');
+mapping = mapping.replace(
+  '[f.contact]: ctx.contactId,',
+  '[f.contact]: { id: ctx.contactId },',
+);
+fs.writeFileSync(mappingFile, mapping);
+
 console.log('Applied deterministic HappyCoin production postpatch');
