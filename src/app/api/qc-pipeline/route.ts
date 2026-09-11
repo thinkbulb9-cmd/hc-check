@@ -124,8 +124,28 @@ export async function GET() {
     createdId = created.id;
 
     stage = "readback";
-    const after = await findCheckinByKey(qcKey);
-    if (!after || after.id !== created.id) throw new Error("readback_failed");
+    let after = await findCheckinByKey(qcKey);
+    for (let i = 0; !after && i < 4; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      after = await findCheckinByKey(qcKey);
+    }
+    if (!after || after.id !== created.id) {
+      const criteria = `(Check_in_Key:equals:${qcKey})`;
+      const rawUrl = apiDomain + "/crm/v8/Client_Care_Check_ins/search?criteria=" + encodeURIComponent(criteria) + "&fields=" + encodeURIComponent("id,Check_in_Key");
+      const rawRes = await fetch(rawUrl, { headers: authHeader, cache: "no-store" });
+      const rawText = await rawRes.text();
+      let raw: unknown = rawText;
+      try { raw = rawText ? JSON.parse(rawText) : null; } catch {}
+      await deleteCheckinRecord(created.id);
+      createdId = null;
+      return NextResponse.json({
+        ok: false,
+        stage: "readback",
+        createdId: created.id,
+        rawStatus: rawRes.status,
+        raw,
+      }, { status: 500 });
+    }
 
     stage = "cleanup";
     await deleteCheckinRecord(created.id);
