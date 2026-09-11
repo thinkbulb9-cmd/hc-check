@@ -35,4 +35,9 @@ if (fs.existsSync(verifyRoute)) {
   fs.writeFileSync(verifyRoute, source);
 }
 
+// Temporary production diagnostic: returns only safe Zoho connectivity/error metadata.
+const diagRoute = 'src/app/api/__diag/zoho/route.ts';
+fs.mkdirSync(path.dirname(diagRoute), { recursive: true });
+fs.writeFileSync(diagRoute, `import { NextResponse } from "next/server";\nimport { findContactByEmail } from "@/lib/zoho";\n\nexport async function GET() {\n  try {\n    const contact = await findContactByEmail("vaasu.challa9@gmail.com");\n    return NextResponse.json({ ok: true, found: !!contact, contactId: contact?.id ?? null, accountsUrl: process.env.ZOHO_ACCOUNTS_URL ?? null, apiDomain: process.env.ZOHO_API_DOMAIN ?? null });\n  } catch (error) {\n    const e = error instanceof Error ? error : new Error(String(error));\n    return NextResponse.json({ ok: false, errorName: e.name, errorMessage: e.message, accountsUrl: process.env.ZOHO_ACCOUNTS_URL ?? null, apiDomain: process.env.ZOHO_API_DOMAIN ?? null }, { status: 500 });\n  }\n}\n`);
+
 console.log(`Restored ${Object.keys(data).length} HappyCoin source files`);
