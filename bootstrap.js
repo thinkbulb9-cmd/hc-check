@@ -15,6 +15,16 @@ for (const [file, content] of Object.entries(data)) {
   fs.writeFileSync(file, content);
 }
 
+const zohoFile = 'src/lib/zoho.ts';
+if (fs.existsSync(zohoFile)) {
+  let source = fs.readFileSync(zohoFile, 'utf8');
+  source = source.replace(
+    'import "server-only";',
+    'import "server-only";\n\nprocess.env.ZOHO_ACCOUNTS_URL ||= "https://accounts.zoho.com";\nprocess.env.ZOHO_API_DOMAIN ||= "https://www.zohoapis.com";',
+  );
+  fs.writeFileSync(zohoFile, source);
+}
+
 const verifyRoute = 'src/app/api/auth/verify/route.ts';
 if (fs.existsSync(verifyRoute)) {
   let source = fs.readFileSync(verifyRoute, 'utf8');
