@@ -28,19 +28,22 @@ if (fs.existsSync(zohoFile)) {
   source = source.replace(
     /export async function findContactByEmail\([\s\S]*?\n}\n\nexport async function getContactDashboardData\([\s\S]*?\n}/,
 `export async function findContactByEmail(email: string): Promise<RawContactRecord | null> {
+  const fields = CONTACT_AUTH_SELECT.replace(/\\s+/g, "");
   const json = (await zohoFetch(
-    \`/crm/v8/Contacts/search?email=\${encodeURIComponent(email)}&fields=\${encodeURIComponent(CONTACT_AUTH_SELECT)}\`,
+    \`/crm/v8/Contacts/search?email=\${encodeURIComponent(email)}&fields=\${encodeURIComponent(fields)}\`,
     { method: "GET" },
   )) as { data?: RawContactRecord[] };
   const rows = json.data ?? [];
-  const exact = rows.filter((row) => String(row.Email ?? "").trim().toLowerCase() === email.trim().toLowerCase());
+  const wanted = email.trim().toLowerCase();
+  const exact = rows.filter((row) => String(row.Email ?? "").trim().toLowerCase() === wanted);
   if (exact.length !== 1) return null;
   return exact[0] ?? null;
 }
 
 export async function getContactDashboardData(contactId: string): Promise<RawContactRecord | null> {
+  const fields = CONTACT_DASHBOARD_SELECT.replace(/\\s+/g, "");
   const json = (await zohoFetch(
-    \`/crm/v8/Contacts/\${encodeURIComponent(contactId)}?fields=\${encodeURIComponent(CONTACT_DASHBOARD_SELECT)}\`,
+    \`/crm/v8/Contacts/\${encodeURIComponent(contactId)}?fields=\${encodeURIComponent(fields)}\`,
     { method: "GET" },
   )) as { data?: RawContactRecord[] };
   return json.data?.[0] ?? null;
@@ -50,21 +53,26 @@ export async function getContactDashboardData(contactId: string): Promise<RawCon
   source = source.replace(
     /export async function findCheckinByKey\([\s\S]*?\n}/,
 `export async function findCheckinByKey(checkInKey: string): Promise<{ id: string } | null> {
-  const json = (await zohoFetch(
-    \`/crm/v8/\${MODULE_API_NAME}/search?criteria=\${encodeURIComponent(\`(\${CHECKIN_FIELDS.checkInKey}:equals:\${checkInKey})\`)}&fields=\${encodeURIComponent(CHECKIN_STATUS_SELECT)}\`,
-    { method: "GET" },
-  )) as { data?: Array<{ id?: string }> };
-  const rows = json.data ?? [];
-  if (rows.length !== 1 || !rows[0]?.id) return null;
-  return { id: rows[0].id };
+  const fields = CHECKIN_STATUS_SELECT.replace(/\\s+/g, "");
+  try {
+    const json = (await zohoFetch(
+      \`/crm/v8/\${MODULE_API_NAME}/search?criteria=\${encodeURIComponent(\`(\${CHECKIN_FIELDS.checkInKey}:equals:\${checkInKey})\`)}&fields=\${encodeURIComponent(fields)}\`,
+      { method: "GET" },
+    )) as { data?: Array<{ id?: string }> };
+    const rows = json.data ?? [];
+    if (rows.length !== 1 || !rows[0]?.id) return null;
+    return { id: rows[0].id };
+  } catch (error) {
+    if (error instanceof ZohoApiError && error.status === 204) return null;
+    throw error;
+  }
 }`,
   );
 
   fs.writeFileSync(zohoFile, source);
 }
 
-// Replace authentication route completely with the same direct Zoho REST
-// lookup already proven against the live HAPPYCOIN org.
+// Authentication route uses direct Zoho REST lookup proven against live org.
 const verifyRoute = 'src/app/api/auth/verify/route.ts';
 fs.mkdirSync(path.dirname(verifyRoute), { recursive: true });
 fs.writeFileSync(verifyRoute, `import { NextRequest, NextResponse } from "next/server";
@@ -118,8 +126,8 @@ async function findExactContact(email: string, mobile: string): Promise<ContactM
   const wantedMobile = normalizeMobile(mobile);
   const matches = rows.filter((row) => {
     const emailOk = String(row.Email ?? "").trim().toLowerCase() === wantedEmail;
-    const storedMobile = normalizeMobile(row.Mobile) || normalizeMobile(row.Phone) || normalizeMobile(row.Home_Phone);
-    return emailOk && wantedMobile.length === 10 && storedMobile === wantedMobile;
+    const storedMobiles = [row.Mobile, row.Phone, row.Home_Phone].map(normalizeMobile).filter(Boolean);
+    return emailOk && wantedMobile.length === 10 && storedMobiles.includes(wantedMobile);
   });
   return matches.length === 1 ? matches[0]! : null;
 }
@@ -129,7 +137,7 @@ export async function POST(req: NextRequest) {
   const ip = await getClientIp();
 
   try {
-    const rl = await rateLimit(\`auth:verify:ip:v3:\${ip}\`, IP_RATE_LIMIT.limit, IP_RATE_LIMIT.windowSeconds);
+    const rl = await rateLimit(\`auth:verify:ip:v4:\${ip}\`, IP_RATE_LIMIT.limit, IP_RATE_LIMIT.windowSeconds);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again in a few minutes." },
@@ -157,7 +165,7 @@ export async function POST(req: NextRequest) {
   const { email, mobile } = parsed.data;
   const identityHash = hashRateLimitIdentifier(\`\${email}|\${mobile}\`);
   try {
-    const rl = await rateLimit(\`auth:verify:identity:v3:\${identityHash}\`, IDENTITY_RATE_LIMIT.limit, IDENTITY_RATE_LIMIT.windowSeconds);
+    const rl = await rateLimit(\`auth:verify:identity:v4:\${identityHash}\`, IDENTITY_RATE_LIMIT.limit, IDENTITY_RATE_LIMIT.windowSeconds);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again in a few minutes." },
@@ -172,15 +180,15 @@ export async function POST(req: NextRequest) {
   try {
     const contact = await findExactContact(email, mobile);
     if (!contact) {
-      logEvent({ event: "AUTH_ATTEMPT_FAILED", status: "failure", requestId, detail: "no_match_v3" });
+      logEvent({ event: "AUTH_ATTEMPT_FAILED", status: "failure", requestId, detail: "no_match_v4" });
       return NextResponse.json({ error: GENERIC_AUTH_FAILURE_MESSAGE }, { status: 401 });
     }
 
     await createSession({ contactId: contact.id });
     logEvent({ event: "AUTH_SUCCESS", status: "success", requestId, contactId: contact.id });
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    logEvent({ event: "AUTH_ATTEMPT_FAILED", status: "failure", requestId, detail: "upstream_v3" });
+  } catch {
+    logEvent({ event: "AUTH_ATTEMPT_FAILED", status: "failure", requestId, detail: "upstream_v4" });
     return NextResponse.json(
       { error: "We're unable to verify your details right now. Please try again shortly." },
       { status: 503 },
@@ -189,7 +197,7 @@ export async function POST(req: NextRequest) {
 }
 `);
 
-// Remove all temporary diagnostics from production.
+// Remove temporary diagnostics except qc-final while final verification is active.
 for (const diag of [
   'src/app/api/diag-login-match/route.ts',
   'src/app/api/diag-contact/route.ts',
