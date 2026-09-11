@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .field-label { @apply mb-1 block text-sm font-medium text-slate-700; }
+  .field-input { @apply w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand; }
+  .field-error { @apply mt-1 text-xs text-red-600; }
+  .btn-primary { @apply inline-flex w-full items-center justify-center rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60; }
+  .card { @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm; }
+  .checkbox-option { @apply flex items-start gap-2 rounded-md border border-slate-200 p-2.5 text-sm hover:bg-slate-50; }
+}
