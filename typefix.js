@@ -9,5 +9,6 @@ fs.writeFileSync(p,s);
 const route='src/app/api/checkin/submit/route.ts';
 let r=fs.readFileSync(route,'utf8');
 r=r.replace('event:"CHECKIN_UPDATED"','event:"CHECKIN_CREATED"');
+r=r.replace('event:"CHECKIN_SAVE_FAILED"','event:"CHECKIN_CREATE_FAILED"');
 fs.writeFileSync(route,r);
 console.log('Applied referral and logger compatibility fixes');
