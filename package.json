@@ -5,7 +5,7 @@
   "description": "HappyCoin Monthly Client Care Check-in web application (Next.js + Zoho CRM)",
   "scripts": {
     "dev": "next dev",
-    "build": "node bootstrap.js && node postpatch.js && node featurepatch.js && node typefix.js && node formfix.js && node hotfix.js && node dashboardpatch.js && node lockui2.js && next build",
+    "build": "node bootstrap.js && node postpatch.js && node featurepatch.js && node typefix.js && node formfix.js && node hotfix.js && node dashboardpatch.js && node centralui.js && next build",
     "start": "next start",
     "lint": "next lint",
     "diagnose:zoho": "tsx scripts/diagnose-zoho.ts"
