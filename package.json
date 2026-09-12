@@ -30,5 +30,6 @@
     "tsx": "4.19.2",
     "dotenv": "16.4.7"
   },
-  "engines": { "node": "22.x" }
+  "engines": { "node": "22.x" },
+  "uiBuild": "approved-screen-mockups-v1"
 }
